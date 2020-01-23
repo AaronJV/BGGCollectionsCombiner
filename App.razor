@@ -1,0 +1,148 @@
+﻿@using System.Text.Json;
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<div>
+    <h1>Combined BoardGameGeek Collections</h1>
+</div>
+@if (GamesList == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Game</th>
+                <th>Owned By</th>
+                <th>Number of Players</th>
+                <th>Playing Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var game in GamesList)
+            {
+                <tr>
+                    <td><a href="https://boardgamegeek.com/boardgame/@game.GameID">@game.Name</a></td>
+                    <td>@(Owners.ContainsKey(game.GameID) ? String.Join(", ", Owners[game.GameID]) : "unkown")</td>
+                    <td>@game.MinPlayerCount - @game.MaxPlayerCount</td>
+                    <td>@game.PlayingTime</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter]
+    public string Usernames { get; set; }
+    private List<Game> GamesList;
+    private Dictionary<int, List<string>> Owners;
+
+    protected override async Task OnInitializedAsync() {
+        //var test = await Http.GetAsync("https://api.geekdo.com/xmlapi2/collection?username=Aaron_V&brief=1&own=1");
+
+        string usernameQueryParams = await JSRuntime.InvokeAsync<string>("getQueryParam", "usernames");
+        if (usernameQueryParams == "" || usernameQueryParams == null) {
+            return;
+        }
+
+        var usernames = usernameQueryParams.Split(',');
+        Dictionary<int, Game> collection = new Dictionary<int, Game>();
+
+        var gamesSet = new HashSet<Game>();
+        Owners = new Dictionary<int, List<string>>();
+
+        try {
+            foreach (var username in usernames) {
+                var cachedList = await JSRuntime.InvokeAsync<string>("getCollection", username);
+                Console.WriteLine($"user: {username}, cached: {cachedList}");
+                List<Game> games;
+
+                if (cachedList != null) {
+                    var jsonStr = StringCompressor.DecompressString(cachedList);
+                    games = JsonSerializer.Deserialize<List<Game>>(jsonStr);
+
+                    foreach (var game in games) {
+                        if (!Owners.ContainsKey(game.GameID)) {
+                            Owners.Add(game.GameID, new List<string>());
+                        }
+                        Owners[game.GameID].Add(username);
+                    }
+                } else {
+                    var xmlDoc = await FetchCollection(username);
+                    games = ParseCollection(xmlDoc, username, collection);
+                    string json;
+                    json = JsonSerializer.Serialize(games);
+                    json = StringCompressor.CompressString(json);
+                    await JSRuntime.InvokeAsync<string>("storeCollection", username, json);
+                }
+                gamesSet.UnionWith(games);
+            }
+
+            GamesList = gamesSet.ToList();
+            GamesList.Sort((a, b) => a.Name.CompareTo(b.Name));
+        } catch (Exception e) {
+            Console.WriteLine(e.Message);
+        }
+    }
+
+
+    protected async Task<XmlDocument> FetchCollection(string username) {
+        var url = $"https://api.geekdo.com/xmlapi2/collection?username={username}&brief=1&own=1&stats=1";
+        var response = await Http.GetAsync(url);
+
+        while (response.StatusCode == System.Net.HttpStatusCode.Accepted) {
+            Thread.Sleep(500);
+            response = await Http.GetAsync(url);
+        }
+        var byteArray = await response.Content.ReadAsByteArrayAsync();
+        var responseString = Encoding.UTF8.GetString(byteArray, 0, byteArray.Length);
+        var xml = new XmlDocument();
+        xml.LoadXml(responseString);
+
+        return xml;
+    }
+
+    protected List<Game> ParseCollection(XmlDocument collectionDoc, string owner, Dictionary<int, Game> collection) {
+        var userList = new List<Game>();
+
+        foreach(XmlNode item in collectionDoc.GetElementsByTagName("item")) {
+            int id = int.Parse(item.Attributes["objectid"].Value);
+
+            if (!Owners.ContainsKey(id)) {
+                Owners.Add(id, new List<string>());
+            }
+
+            Owners[id].Add(owner);
+
+            Game game = new Game() { GameID = id };
+            
+            foreach (XmlNode info in item.ChildNodes) {
+                if (info.Name == "name") {
+                    game.Name = info.InnerText;
+                } else if (info.Name == "stats") {
+                    game.MaxPlayerCount = int.Parse(info.Attributes["maxplayers"].Value);
+                    game.MinPlayerCount = int.Parse(info.Attributes["minplayers"].Value);
+                    game.PlayingTime = int.Parse(info.Attributes["playingtime"].Value);
+                }
+            }
+            userList.Add(game);
+        }
+
+        return userList;
+    }
+
+
+
+    public class Game {
+
+        public string Name { get; set; }
+        public int GameID { get; set; }
+        public int PlayingTime { get; set; }
+        public double Rating { get; set; }
+        public int MinPlayerCount { get; set; }
+        public int MaxPlayerCount { get; set; }
+    }
+}
