@@ -2,41 +2,43 @@
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
-<div>
-    <h1>Combined BoardGameGeek Collections</h1>
-</div>
-@if (GamesList == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Game</th>
-                <th>Owned By</th>
-                <th>Number of Players</th>
-                <th>Playing Time</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var game in GamesList)
+<div class="container">
+    <div class="row">
+        <div class="col s12 m12 l9">
+            @if (GamesList == null)
             {
-                <tr>
-                    <td><a href="https://boardgamegeek.com/boardgame/@game.GameID">@game.Name</a></td>
-                    <td>@(Owners.ContainsKey(game.GameID) ? String.Join(", ", Owners[game.GameID]) : "unkown")</td>
-                    <td>@game.MinPlayerCount - @game.MaxPlayerCount</td>
-                    <td>@game.PlayingTime</td>
-                </tr>
+                <p><em>Loading...</em></p>
             }
-        </tbody>
-    </table>
-}
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Game</th>
+                            <th>Owned By</th>
+                            <th>Number of Players</th>
+                            <th>Playing Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var game in GamesList)
+                        {
+                            <tr>
+                                <td><a href="https://boardgamegeek.com/boardgame/@game.GameID">@game.Name</a></td>
+                                <td>@(Owners.ContainsKey(game.GameID) ? String.Join(", ", Owners[game.GameID]) : "unkown")</td>
+                                <td>@game.MinPlayerCount - @game.MaxPlayerCount</td>
+                                <td>@game.PlayingTime</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+            
 
 @code {
-    [Parameter]
-    public string Usernames { get; set; }
     private List<Game> GamesList;
     private Dictionary<int, List<string>> Owners;
 

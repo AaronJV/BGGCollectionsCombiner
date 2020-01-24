@@ -1,9 +1,19 @@
-﻿html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+﻿nav.top-nav {
+    height:110px;
+    -webkit-box-shadow:none;
+    box-shadow:none;
+    border-bottom:1px solid rgba(0,0,0,0.14);
+    background-color:transparent
+}
+nav.top-nav h1.header {
+    margin:0;
+    padding-top:22px
 }
 
-app {
-    position: relative;
+.header {
+    color: 
+    #ee6e73;
+    font-weight: 300;
 }
 
 #blazor-error-ui {
