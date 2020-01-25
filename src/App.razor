@@ -43,8 +43,6 @@
     private Dictionary<int, List<string>> Owners;
 
     protected override async Task OnInitializedAsync() {
-        //var test = await Http.GetAsync("https://api.geekdo.com/xmlapi2/collection?username=Aaron_V&brief=1&own=1");
-
         string usernameQueryParams = await JSRuntime.InvokeAsync<string>("getQueryParam", "usernames");
         if (usernameQueryParams == "" || usernameQueryParams == null) {
             return;
@@ -59,7 +57,6 @@
         try {
             foreach (var username in usernames) {
                 var cachedList = await JSRuntime.InvokeAsync<string>("getCollection", username);
-                Console.WriteLine($"user: {username}, cached: {cachedList}");
                 List<Game> games;
 
                 if (cachedList != null) {
@@ -121,15 +118,14 @@
 
             Game game = new Game() { GameID = id };
             
-            foreach (XmlNode info in item.ChildNodes) {
-                if (info.Name == "name") {
-                    game.Name = info.InnerText;
-                } else if (info.Name == "stats") {
-                    game.MaxPlayerCount = int.Parse(info.Attributes["maxplayers"].Value);
-                    game.MinPlayerCount = int.Parse(info.Attributes["minplayers"].Value);
-                    game.PlayingTime = int.Parse(info.Attributes["playingtime"].Value);
-                }
-            }
+            game.Name = item.SelectSingleNode("./name").InnerText;
+            var statsNode = item.SelectSingleNode("./stats");
+            game.MaxPlayerCount = int.Parse(statsNode.Attributes["maxplayers"].Value);
+            game.MinPlayerCount = int.Parse(statsNode.Attributes["minplayers"].Value);
+            game.PlayingTime = int.Parse(statsNode.Attributes["playingtime"].Value);
+            game.Rating = double.Parse(statsNode.SelectSingleNode("./rating/average").Attributes["value"].Value);
+            game.Rating = double.Parse(statsNode.SelectSingleNode("./rating/bayesaverage").Attributes["value"].Value);
+
             userList.Add(game);
         }
 
@@ -143,6 +139,7 @@
         public int GameID { get; set; }
         public int PlayingTime { get; set; }
         public double Rating { get; set; }
+        public double GeekRating { get; set; }
         public int MinPlayerCount { get; set; }
         public int MaxPlayerCount { get; set; }
 
