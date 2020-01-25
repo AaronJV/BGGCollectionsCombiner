@@ -1,4 +1,4 @@
-﻿@using System.Text.Json;
+@using System.Text.Json;
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
@@ -138,13 +138,24 @@
 
 
 
-    public class Game {
-
+    public class Game : IEquatable<Game> {
         public string Name { get; set; }
         public int GameID { get; set; }
         public int PlayingTime { get; set; }
         public double Rating { get; set; }
         public int MinPlayerCount { get; set; }
         public int MaxPlayerCount { get; set; }
+
+        public override bool Equals(object obj) {
+            return obj is Game && Equals((Game) obj);
+        }
+
+        public bool Equals(Game other) {
+            return GameID == other.GameID;
+        }
+
+        public override int GetHashCode() {
+            return GameID;
+        }
     }
 }
