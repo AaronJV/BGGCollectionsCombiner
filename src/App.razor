@@ -1,10 +1,11 @@
-@using System.Text.Json;
+﻿@using System.Text.Json;
+@using Microsoft.AspNetCore.Components.Web
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 
 <div class="container">
     <div class="row">
-        <div class="col s12 m12 l9">
+        <div class="col m12">
             @if (GamesList == null)
             {
                 <p><em>Loading...</em></p>
@@ -14,10 +15,11 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Game</th>
-                            <th>Owned By</th>
-                            <th>Number of Players</th>
-                            <th>Playing Time</th>
+                            @createHeader("Game", "Name")
+                            @createHeader("Owned By", "", false)
+                            @createHeader("Number of Players")
+                            @createHeader("Playing Time", "PlayingTime")
+                            @createHeader("Geek Score", "Rating")
                         </tr>
                     </thead>
                     <tbody>
@@ -26,12 +28,16 @@
                             <tr>
                                 <td><a href="https://boardgamegeek.com/boardgame/@game.GameID">@game.Name</a></td>
                                 <td>@(Owners.ContainsKey(game.GameID) ? String.Join(", ", Owners[game.GameID]) : "unkown")</td>
-                                <td>@game.MinPlayerCount - @game.MaxPlayerCount</td>
+                                <td>@(game.MinPlayerCount == game.MaxPlayerCount ? $"{game.MinPlayerCount}" : $"{game.MinPlayerCount} - {game.MaxPlayerCount}")</td>
                                 <td>@game.PlayingTime</td>
+                                <td>@game.Rating</td>
                             </tr>
                         }
                     </tbody>
                 </table>
+                <div>
+                    Powered by the Board Game Geek API
+                </div>
             }
         </div>
     </div>
@@ -41,6 +47,63 @@
 @code {
     private List<Game> GamesList;
     private Dictionary<int, List<string>> Owners;
+    private string SortColumn;
+    private bool SortAsc;
+
+
+    private RenderFragment createHeader(string columnName, String key = "", bool sortable = true) {
+        if (sortable) {
+            return @<th>
+                <span @onclick="() => SortTable(columnName, key)">
+                    @columnName
+                </span>
+                @if (columnName == SortColumn) {
+                    <span>
+                        <i class="material-icons">arrow_drop_down</i>
+                    </span>
+                }
+            </th>;
+        }
+        return @<th><span>@columnName</span></th>;
+    }
+
+    private bool SortTable(string columnName, string key) {
+        Console.WriteLine(columnName);
+        if (columnName == SortColumn) {
+            SortAsc = !SortAsc;
+        }
+
+        SortColumn = columnName;
+
+        if(columnName == "Number of Players") {
+            GamesList.Sort((game1, game2) => {
+                if (SortAsc) {
+                    return game1.MinPlayerCount.CompareTo(game2.MinPlayerCount);
+                }
+                return game2.MaxPlayerCount.CompareTo(game1.MaxPlayerCount);
+            });
+        } else {
+            GamesList.Sort((game1, game2) => {
+                dynamic var1 = game1.GetType().GetProperty(key).GetValue(game1);
+                dynamic var2 = game2.GetType().GetProperty(key).GetValue(game2);
+
+                if (var1 == null && var2 == null) {
+                    return 0;
+                } else if (var1 == null) {
+                    return SortAsc ? 1 : -1;
+                } else if (var1 == null) {
+                    return SortAsc ? -1 : 1;
+                }
+
+                if (SortAsc) {
+                    return var1.CompareTo(var2);
+                }
+                return var2.CompareTo(var1);
+            });
+        }
+
+        return true;
+    }
 
     protected override async Task OnInitializedAsync() {
         string usernameQueryParams = await JSRuntime.InvokeAsync<string>("getQueryParam", "usernames");
@@ -153,6 +216,20 @@
 
         public override int GetHashCode() {
             return GameID;
+        }
+
+        public static int CompareName(Game game1, Game game2, bool sortAscending) {
+            if (sortAscending) {
+                return game1.Name.CompareTo(game2);
+            }
+            return game2.Name.CompareTo(game1);
+        }
+
+        public static int ComparePlayers(Game game1, Game game2, bool sortAscending) {
+            if (sortAscending) {
+                return game1.MinPlayerCount.CompareTo(game2.MinPlayerCount);
+            }
+            return game2.MaxPlayerCount.CompareTo(game1.MaxPlayerCount);
         }
     }
 }
