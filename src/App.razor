@@ -1,18 +1,16 @@
 ﻿@using System.Text.Json;
-@using Microsoft.AspNetCore.Components.Web
-@inject HttpClient Http
-@inject IJSRuntime JSRuntime
+@using Microsoft.AspNetCore.Components.Web;
+@inject HttpClient Http;
+@inject IJSRuntime JSRuntime;
+@inject NavigationManager NavigationManager
 
 <div class="container">
     <div class="row">
         <div class="col m12">
-            @if (GamesList == null)
-            {
+            @if (RequestedList && GamesList == null) {
                 <p><em>Loading...</em></p>
-            }
-            else
-            {
-                <table class="table">
+            } else if (RequestedList) {
+                <table class="table highlight">
                     <thead>
                         <tr>
                             @createHeader("Game", "Name")
@@ -23,8 +21,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var game in GamesList)
-                        {
+                        @foreach (var game in GamesList.Skip((CurrentPage - 1) * PageSize).Take(PageSize)) {
                             <tr>
                                 <td><a href="https://boardgamegeek.com/boardgame/@game.GameID">@game.Name</a></td>
                                 <td>@(Owners.ContainsKey(game.GameID) ? String.Join(", ", Owners[game.GameID]) : "unkown")</td>
@@ -35,11 +32,37 @@
                         }
                     </tbody>
                 </table>
-                <div>
-                    Powered by the Board Game Geek API
-                </div>
+                <ul class="pagination">
+                    <li class="@(1 == CurrentPage ? "disabled" : "waves-effect")">
+                        <a @onclick="() => CurrentPage--"><i class="material-icons">chevron_left</i></a>
+                    </li>
+                    @foreach (var pageNum in Enumerable.Range(1, PageCount)) {
+                        <li class="@(pageNum == CurrentPage ? "active" : "waves-effect")">
+                            <a @onclick="() => CurrentPage = pageNum">@pageNum</a>
+                        </li>
+                    }
+                    <li class="@(PageCount == CurrentPage ? "disabled" : "waves-effect")">
+                        <a @onclick="() => CurrentPage++"><i class="material-icons">chevron_right</i></a>
+                    </li>
+                </ul>
             }
         </div>
+    </div>
+    <div class="row">
+        <div class="col s12">
+            <p>Enter Comma Seperated List of Board Game Geek Usernames</p>
+            <div class="row">
+                <div class="input-field col s6">
+                    <input type="text" id="usernames" placeholder="Usernames" @bind="Usernames">
+                </div>
+                <div class="input-field col s4">
+                    <div class="btn waves-effect" @onclick="LoadCollection">Load Collection</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        Powered by the Board Game Geek API
     </div>
 </div>
             
@@ -49,6 +72,11 @@
     private Dictionary<int, List<string>> Owners;
     private string SortColumn;
     private bool SortAsc;
+    private string Usernames = "";
+    private bool RequestedList = false;
+    private int PageSize = 25;
+    private int CurrentPage = 1;
+    private int PageCount = 1;
 
 
     private RenderFragment createHeader(string columnName, String key = "", bool sortable = true) {
@@ -111,7 +139,10 @@
             return;
         }
 
+        RequestedList = true;
+
         var usernames = usernameQueryParams.Split(',');
+        Usernames = string.Join(", ", usernames);
         Dictionary<int, Game> collection = new Dictionary<int, Game>();
 
         var gamesSet = new HashSet<Game>();
@@ -145,6 +176,7 @@
 
             GamesList = gamesSet.ToList();
             GamesList.Sort((a, b) => a.Name.CompareTo(b.Name));
+            PageCount = (GamesList.Count / PageSize) + 1;
         } catch (Exception e) {
             Console.WriteLine(e.Message);
         }
@@ -193,6 +225,13 @@
         }
 
         return userList;
+    }
+
+    public void LoadCollection() {
+        if (Usernames.Length > 0) {
+            var usernames = Usernames.Split(',').Select(username => username.Trim());
+            NavigationManager.NavigateTo($"/?usernames={string.Join(",", usernames)}", true);
+        }
     }
 
 
